@@ -62,7 +62,7 @@ jobs:
           echo "Updated AndroidManifest.xml:"
           cat "$MANIFEST_FILE"
 
-      - name: Set compileSdkVersion and targetSdkVersion to 34
+      - name: Set compileSdkVersion and targetSdkVersion to 36
         run: |
           # Determine which gradle file exists
           if [ -f "android/app/build.gradle.kts" ]; then
@@ -73,13 +73,13 @@ jobs:
 
           echo "Using gradle file: $GRADLE_FILE"
 
-          # Update compileSdk to 34 (handles both flutter reference and numeric values)
-          sed -i 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 34/' "$GRADLE_FILE"
-          sed -i 's/compileSdkVersion\s*flutter\.compileSdkVersion/compileSdkVersion 34/' "$GRADLE_FILE"
+          # Update compileSdk to 36 (handles both flutter reference and numeric values)
+          sed -i 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/' "$GRADLE_FILE"
+          sed -i 's/compileSdkVersion\s*flutter\.compileSdkVersion/compileSdkVersion 36/' "$GRADLE_FILE"
 
-          # Update targetSdk to 34 (handles both flutter reference and numeric values)
-          sed -i 's/targetSdk\s*=\s*flutter\.targetSdkVersion/targetSdk = 34/' "$GRADLE_FILE"
-          sed -i 's/targetSdkVersion\s*flutter\.targetSdkVersion/targetSdkVersion 34/' "$GRADLE_FILE"
+          # Update targetSdk to 36 (handles both flutter reference and numeric values)
+          sed -i 's/targetSdk\s*=\s*flutter\.targetSdkVersion/targetSdk = 36/' "$GRADLE_FILE"
+          sed -i 's/targetSdkVersion\s*flutter\.targetSdkVersion/targetSdkVersion 36/' "$GRADLE_FILE"
 
           echo "Updated build.gradle:"
           cat "$GRADLE_FILE"
@@ -103,6 +103,18 @@ jobs:
                 fi
               else
                 echo "✓ Already has namespace: $path/build.gradle"
+              fi
+            fi
+
+            # Also remove the deprecated package attribute from AndroidManifest.xml
+            MANIFEST="$path/src/main/AndroidManifest.xml"
+            if [ -f "$MANIFEST" ]; then
+              if grep -q 'package=' "$MANIFEST"; then
+                sed -i 's/[[:space:]]*package="[^"]*"//g' "$MANIFEST"
+                echo "✓ Removed deprecated package attribute from: $MANIFEST"
+                cat "$MANIFEST"
+              else
+                echo "✓ No deprecated package attribute in: $MANIFEST"
               fi
             fi
           done
