@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -86,12 +87,32 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Patch blue_thermal_printer plugin for AGP 8.0+ compatibility
+        run: |
+          # Find and patch the blue_thermal_printer plugin build.gradle to add namespace
+          # The namespace is based on the plugin's Android package structure
+          for path in "$HOME"/.pub-cache/hosted/pub.dev/blue_thermal_printer*/android; do
+            if [ -f "$path/build.gradle" ]; then
+              if ! grep -q "namespace" "$path/build.gradle"; then
+                if sed -i '/^android {/a\    namespace "com.kamilpowalowski.blue_thermal_printer"' "$path/build.gradle"; then
+                  echo "✓ Patched: $path/build.gradle"
+                  cat "$path/build.gradle"
+                else
+                  echo "✗ Failed to patch: $path/build.gradle"
+                  exit 1
+                fi
+              else
+                echo "✓ Already has namespace: $path/build.gradle"
+              fi
+            fi
+          done
 
-      - name: Upload debug APK as artifact
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload release APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
