@@ -1,0 +1,23 @@
+name: simple_thermal_printer
+description: A minimal Flutter app to print via thermal printers (ESC/POS) over Bluetooth.
+publish_to: 'none'
+version: 0.0.2+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  blue_thermal_printer: ^1.2.3
+  esc_pos_utils: ^1.0.0
+  path_provider: ^2.1.4
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
