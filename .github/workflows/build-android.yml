@@ -1,0 +1,97 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Generate Android folder
+        run: |
+          flutter create --platforms=android .
+
+      - name: Inject Bluetooth and location permissions into AndroidManifest.xml
+        run: |
+          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+
+          # Add permissions only if not already present
+          if ! grep -q "android.permission.BLUETOOTH\"" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.BLUETOOTH"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.permission.BLUETOOTH_ADMIN" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.permission.BLUETOOTH_SCAN" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.permission.BLUETOOTH_CONNECT" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.permission.ACCESS_FINE_LOCATION" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.permission.ACCESS_COARSE_LOCATION" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>' "$MANIFEST_FILE"
+          fi
+          if ! grep -q "android.hardware.bluetooth" "$MANIFEST_FILE"; then
+            sed -i '/<application/i\    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>' "$MANIFEST_FILE"
+          fi
+
+          echo "Updated AndroidManifest.xml:"
+          cat "$MANIFEST_FILE"
+
+      - name: Set compileSdkVersion and targetSdkVersion to 34
+        run: |
+          # Determine which gradle file exists
+          if [ -f "android/app/build.gradle.kts" ]; then
+            GRADLE_FILE="android/app/build.gradle.kts"
+          else
+            GRADLE_FILE="android/app/build.gradle"
+          fi
+
+          echo "Using gradle file: $GRADLE_FILE"
+
+          # Update compileSdk to 34 (handles both flutter reference and numeric values)
+          sed -i 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 34/' "$GRADLE_FILE"
+          sed -i 's/compileSdkVersion\s*flutter\.compileSdkVersion/compileSdkVersion 34/' "$GRADLE_FILE"
+
+          # Update targetSdk to 34 (handles both flutter reference and numeric values)
+          sed -i 's/targetSdk\s*=\s*flutter\.targetSdkVersion/targetSdk = 34/' "$GRADLE_FILE"
+          sed -i 's/targetSdkVersion\s*flutter\.targetSdkVersion/targetSdkVersion 34/' "$GRADLE_FILE"
+
+          echo "Updated build.gradle:"
+          cat "$GRADLE_FILE"
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
