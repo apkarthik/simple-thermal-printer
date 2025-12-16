@@ -71,9 +71,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     _intentDataStreamSubscription?.cancel();
     _bluetoothStateSubscription?.cancel();
     // Disable wake lock when app is disposed
-    WakelockPlus.disable().catchError((error) {
+    unawaited(WakelockPlus.disable().catchError((error) {
       debugPrint('Error disabling wake lock in dispose: $error');
-    });
+    }));
     super.dispose();
   }
 
@@ -199,13 +199,13 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
       // Enable/disable wake lock based on connection state
       // Use unawaited to avoid blocking the stream, errors are handled in the methods
       if (newConnectedState) {
-        _enableWakeLock().catchError((error) {
+        unawaited(_enableWakeLock().catchError((error) {
           debugPrint('Error enabling wake lock in state listener: $error');
-        });
+        }));
       } else {
-        _disableWakeLock().catchError((error) {
+        unawaited(_disableWakeLock().catchError((error) {
           debugPrint('Error disabling wake lock in state listener: $error');
-        });
+        }));
       }
     });
   }
