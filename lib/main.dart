@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'permissions.dart';
 import 'settings.dart';
@@ -50,11 +53,23 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   PaperSize _paperSize = PaperSize.mm58;
   String _codeTable = 'CP1252';
 
+  // Shared intent subscription
+  late StreamSubscription _intentDataStreamSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _initBluetooth();
+    _initSharedIntent();
+  }
+
+  @override
+  void dispose() {
+    _intentDataStreamSubscription.cancel();
+    // Disable wake lock when app is disposed
+    WakelockPlus.disable();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -63,6 +78,90 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     setState(() {
       _paperSize = (size == 'mm80') ? PaperSize.mm80 : PaperSize.mm58;
       _codeTable = table ?? 'CP1252';
+    });
+  }
+
+  void _initSharedIntent() {
+    // For sharing text when app is already opened
+    _intentDataStreamSubscription = ReceiveSharingIntent.getTextStream().listen((String value) {
+      if (value.isNotEmpty) {
+        setState(() {
+          textController.text = value;
+        });
+        _showSharedContentDialog(value);
+      }
+    }, onError: (err) {
+      debugPrint("Error receiving shared intent: $err");
+    });
+
+    // For sharing text when app is closed
+    ReceiveSharingIntent.getInitialText().then((String? value) {
+      if (value != null && value.isNotEmpty) {
+        setState(() {
+          textController.text = value;
+        });
+        _showSharedContentDialog(value);
+      }
+    });
+  }
+
+  void _showSharedContentDialog(String sharedText) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Shared Content Received'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('The following text was shared with the printer app:'),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      sharedText,
+                      maxLines: 10,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isConnected 
+                      ? 'Ready to print!' 
+                      : 'Connect to a printer first to print this content.',
+                    style: TextStyle(
+                      color: isConnected ? Colors.green : Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+                if (isConnected)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _printText(sharedText);
+                    },
+                    icon: const Icon(Icons.print),
+                    label: const Text('Print Now'),
+                  ),
+              ],
+            );
+          },
+        );
+      }
     });
   }
 
@@ -75,11 +174,42 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
       isConnected = connected == true;
     });
 
+    // Enable wake lock if already connected
+    if (isConnected) {
+      await _enableWakeLock();
+    }
+
     bluetooth.onStateChanged().listen((state) {
+      final newConnectedState = state == BlueThermalPrinter.CONNECTED;
       setState(() {
-        isConnected = state == BlueThermalPrinter.CONNECTED;
+        isConnected = newConnectedState;
       });
+
+      // Enable/disable wake lock based on connection state
+      if (newConnectedState) {
+        _enableWakeLock();
+      } else {
+        _disableWakeLock();
+      }
     });
+  }
+
+  Future<void> _enableWakeLock() async {
+    try {
+      await WakelockPlus.enable();
+      debugPrint('Wake lock enabled - printer will stay connected');
+    } catch (e) {
+      debugPrint('Failed to enable wake lock: $e');
+    }
+  }
+
+  Future<void> _disableWakeLock() async {
+    try {
+      await WakelockPlus.disable();
+      debugPrint('Wake lock disabled');
+    } catch (e) {
+      debugPrint('Failed to disable wake lock: $e');
+    }
   }
 
   Future<void> _attemptAutoReconnect() async {
@@ -147,6 +277,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_device_address', device.address ?? '');
 
+      // Enable wake lock to keep connection alive
+      await _enableWakeLock();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connected to ${device.name ?? device.address}')),
       );
@@ -164,6 +297,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
         selectedDevice = null;
         isConnected = false;
       });
+      
+      // Disable wake lock when disconnected
+      await _disableWakeLock();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Disconnect failed: $e')),
@@ -339,15 +475,45 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
           if (selectedDevice != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Row(
+              child: Column(
                 children: [
-                  const Icon(Icons.bluetooth_connected, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Connected: ${selectedDevice!.name ?? selectedDevice!.address}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.bluetooth_connected, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Connected: ${selectedDevice!.name ?? selectedDevice!.address}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  FutureBuilder<bool>(
+                    future: WakelockPlus.enabled,
+                    builder: (context, snapshot) {
+                      final wakeLockEnabled = snapshot.data ?? false;
+                      return Row(
+                        children: [
+                          Icon(
+                            wakeLockEnabled ? Icons.power : Icons.power_off,
+                            color: wakeLockEnabled ? Colors.green : Colors.grey,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            wakeLockEnabled 
+                              ? 'Keep-alive: ON (Printer stays connected)' 
+                              : 'Keep-alive: OFF',
+                            style: TextStyle(
+                              color: wakeLockEnabled ? Colors.green : Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
