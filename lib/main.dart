@@ -69,7 +69,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   void dispose() {
     _intentDataStreamSubscription?.cancel();
     // Disable wake lock when app is disposed
-    WakelockPlus.disable();
+    WakelockPlus.disable().catchError((error) {
+      debugPrint('Error disabling wake lock in dispose: $error');
+    });
     super.dispose();
   }
 
@@ -103,6 +105,8 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
         });
         _showSharedContentDialog(value);
       }
+    }).catchError((error) {
+      debugPrint("Error getting initial shared intent: $error");
     });
   }
 
