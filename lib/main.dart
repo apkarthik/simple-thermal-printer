@@ -85,7 +85,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   void _initSharedIntent() {
     // For sharing text when app is already opened
     _intentDataStreamSubscription = ReceiveSharingIntent.getTextStream().listen((String value) {
-      if (value.isNotEmpty) {
+      if (value.isNotEmpty && mounted) {
         setState(() {
           textController.text = value;
         });
@@ -171,26 +171,35 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     await _attemptAutoReconnect();
 
     bool? connected = await bluetooth.isConnected;
-    setState(() {
-      isConnected = connected == true;
-    });
+    if (mounted) {
+      setState(() {
+        isConnected = connected == true;
+      });
+    }
 
     // Enable wake lock if already connected
     if (isConnected) {
       await _enableWakeLock();
     }
 
-    bluetooth.onStateChanged().listen((state) async {
+    bluetooth.onStateChanged().listen((state) {
       final newConnectedState = state == BlueThermalPrinter.CONNECTED;
-      setState(() {
-        isConnected = newConnectedState;
-      });
+      if (mounted) {
+        setState(() {
+          isConnected = newConnectedState;
+        });
+      }
 
       // Enable/disable wake lock based on connection state
+      // Use unawaited to avoid blocking the stream, errors are handled in the methods
       if (newConnectedState) {
-        await _enableWakeLock();
+        _enableWakeLock().catchError((error) {
+          debugPrint('Error enabling wake lock in state listener: $error');
+        });
       } else {
-        await _disableWakeLock();
+        _disableWakeLock().catchError((error) {
+          debugPrint('Error disabling wake lock in state listener: $error');
+        });
       }
     });
   }
