@@ -54,8 +54,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   PaperSize _paperSize = PaperSize.mm58;
   String _codeTable = 'CP1252';
 
-  // Shared intent subscription
+  // Subscriptions
   StreamSubscription? _intentDataStreamSubscription;
+  StreamSubscription? _bluetoothStateSubscription;
 
   @override
   void initState() {
@@ -68,6 +69,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   @override
   void dispose() {
     _intentDataStreamSubscription?.cancel();
+    _bluetoothStateSubscription?.cancel();
     // Disable wake lock when app is disposed
     WakelockPlus.disable().catchError((error) {
       debugPrint('Error disabling wake lock in dispose: $error');
@@ -186,7 +188,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
       await _enableWakeLock();
     }
 
-    bluetooth.onStateChanged().listen((state) {
+    _bluetoothStateSubscription = bluetooth.onStateChanged().listen((state) {
       final newConnectedState = state == BlueThermalPrinter.CONNECTED;
       if (mounted) {
         setState(() {
@@ -253,10 +255,12 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
       if ((match.address ?? '').isNotEmpty) {
         await bluetooth.connect(match);
-        setState(() {
-          selectedDevice = match;
-          isConnected = true;
-        });
+        if (mounted) {
+          setState(() {
+            selectedDevice = match;
+            isConnected = true;
+          });
+        }
         // Enable wake lock after successful auto-reconnect
         await _enableWakeLock();
       }
