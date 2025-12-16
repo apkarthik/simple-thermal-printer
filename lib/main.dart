@@ -45,6 +45,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   BluetoothDevice? selectedDevice;
   bool isConnected = false;
   bool isScanning = false;
+  bool isWakeLockEnabled = false;
 
   // Custom text input
   final TextEditingController textController = TextEditingController(text: 'Hello from Flutter!');
@@ -54,7 +55,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   String _codeTable = 'CP1252';
 
   // Shared intent subscription
-  late StreamSubscription _intentDataStreamSubscription;
+  StreamSubscription? _intentDataStreamSubscription;
 
   @override
   void initState() {
@@ -66,7 +67,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
   @override
   void dispose() {
-    _intentDataStreamSubscription.cancel();
+    _intentDataStreamSubscription?.cancel();
     // Disable wake lock when app is disposed
     WakelockPlus.disable();
     super.dispose();
@@ -179,7 +180,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
       await _enableWakeLock();
     }
 
-    bluetooth.onStateChanged().listen((state) {
+    bluetooth.onStateChanged().listen((state) async {
       final newConnectedState = state == BlueThermalPrinter.CONNECTED;
       setState(() {
         isConnected = newConnectedState;
@@ -187,9 +188,9 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
       // Enable/disable wake lock based on connection state
       if (newConnectedState) {
-        _enableWakeLock();
+        await _enableWakeLock();
       } else {
-        _disableWakeLock();
+        await _disableWakeLock();
       }
     });
   }
@@ -197,6 +198,11 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   Future<void> _enableWakeLock() async {
     try {
       await WakelockPlus.enable();
+      if (mounted) {
+        setState(() {
+          isWakeLockEnabled = true;
+        });
+      }
       debugPrint('Wake lock enabled - printer will stay connected');
     } catch (e) {
       debugPrint('Failed to enable wake lock: $e');
@@ -206,6 +212,11 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
   Future<void> _disableWakeLock() async {
     try {
       await WakelockPlus.disable();
+      if (mounted) {
+        setState(() {
+          isWakeLockEnabled = false;
+        });
+      }
       debugPrint('Wake lock disabled');
     } catch (e) {
       debugPrint('Failed to disable wake lock: $e');
@@ -490,30 +501,24 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  FutureBuilder<bool>(
-                    future: WakelockPlus.enabled,
-                    builder: (context, snapshot) {
-                      final wakeLockEnabled = snapshot.data ?? false;
-                      return Row(
-                        children: [
-                          Icon(
-                            wakeLockEnabled ? Icons.power : Icons.power_off,
-                            color: wakeLockEnabled ? Colors.green : Colors.grey,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            wakeLockEnabled 
-                              ? 'Keep-alive: ON (Printer stays connected)' 
-                              : 'Keep-alive: OFF',
-                            style: TextStyle(
-                              color: wakeLockEnabled ? Colors.green : Colors.grey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  Row(
+                    children: [
+                      Icon(
+                        isWakeLockEnabled ? Icons.power : Icons.power_off,
+                        color: isWakeLockEnabled ? Colors.green : Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isWakeLockEnabled 
+                          ? 'Keep-alive: ON (Printer stays connected)' 
+                          : 'Keep-alive: OFF',
+                        style: TextStyle(
+                          color: isWakeLockEnabled ? Colors.green : Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
