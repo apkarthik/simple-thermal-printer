@@ -97,7 +97,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
     // For sharing text when app is closed
     ReceiveSharingIntent.getInitialText().then((String? value) {
-      if (value != null && value.isNotEmpty) {
+      if (value != null && value.isNotEmpty && mounted) {
         setState(() {
           textController.text = value;
         });
@@ -244,6 +244,8 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
           selectedDevice = match;
           isConnected = true;
         });
+        // Enable wake lock after successful auto-reconnect
+        await _enableWakeLock();
       }
     } catch (_) {
       // Silently ignore auto-reconnect failures
