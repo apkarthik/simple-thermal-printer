@@ -88,7 +88,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
   void _initSharedIntent() {
     // For sharing text when app is already opened
-    _intentDataStreamSubscription = ReceiveSharingIntent.getTextStream().listen((String value) {
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getTextStream().listen((String value) {
       if (value.isNotEmpty && mounted) {
         setState(() {
           textController.text = value;
@@ -100,7 +100,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     });
 
     // For sharing text when app is closed
-    ReceiveSharingIntent.getInitialText().then((String? value) {
+    ReceiveSharingIntent.instance.getInitialText().then((String? value) {
       if (value != null && value.isNotEmpty && mounted) {
         setState(() {
           textController.text = value;
