@@ -88,24 +88,32 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
   void _initSharedIntent() {
     // For sharing text when app is already opened
-    _intentDataStreamSubscription = ReceiveSharingIntent.getTextStream().listen((String value) {
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
       if (value.isNotEmpty && mounted) {
-        setState(() {
-          textController.text = value;
-        });
-        _showSharedContentDialog(value);
+        // Extract text from SharedMediaFile - text is stored in the 'path' property for text shares
+        final String sharedText = value.first.path;
+        if (sharedText.isNotEmpty) {
+          setState(() {
+            textController.text = sharedText;
+          });
+          _showSharedContentDialog(sharedText);
+        }
       }
     }, onError: (err) {
       debugPrint("Error receiving shared intent: $err");
     });
 
     // For sharing text when app is closed
-    ReceiveSharingIntent.getInitialText().then((String? value) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile>? value) {
       if (value != null && value.isNotEmpty && mounted) {
-        setState(() {
-          textController.text = value;
-        });
-        _showSharedContentDialog(value);
+        // Extract text from SharedMediaFile - text is stored in the 'path' property for text shares
+        final String sharedText = value.first.path;
+        if (sharedText.isNotEmpty) {
+          setState(() {
+            textController.text = sharedText;
+          });
+          _showSharedContentDialog(sharedText);
+        }
       }
     }).catchError((error) {
       debugPrint("Error getting initial shared intent: $error");
