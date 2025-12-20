@@ -106,7 +106,7 @@ jobs:
               echo "                }" >> "$ROOT_GRADLE"
               echo "            }" >> "$ROOT_GRADLE"
               echo "        }" >> "$ROOT_GRADLE"
-              echo "        " >> "$ROOT_GRADLE"
+              echo "" >> "$ROOT_GRADLE"
               echo "        // Configure Kotlin JVM target for all Kotlin compilation tasks" >> "$ROOT_GRADLE"
               echo "        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {" >> "$ROOT_GRADLE"
               echo "            kotlinOptions {" >> "$ROOT_GRADLE"
@@ -120,8 +120,35 @@ jobs:
               echo "Root build.gradle already has subprojects configuration"
               # Add our configuration if tasks.withType is not already present
               if ! grep -q "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)" "$ROOT_GRADLE"; then
-                # Add Kotlin JVM target configuration to existing subprojects block
-                sed -i '/subprojects {/a\    afterEvaluate { project ->\n        if (project.hasProperty('"'"'android'"'"')) {\n            project.android {\n                compileOptions {\n                    sourceCompatibility JavaVersion.VERSION_17\n                    targetCompatibility JavaVersion.VERSION_17\n                }\n            }\n        }\n        \n        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n            kotlinOptions {\n                jvmTarget = "17"\n            }\n        }\n    }' "$ROOT_GRADLE"
+                # Find the line number where subprojects block starts
+                SUBPROJECTS_LINE=$(grep -n "subprojects {" "$ROOT_GRADLE" | head -1 | cut -d: -f1)
+                if [ -n "$SUBPROJECTS_LINE" ]; then
+                  # Create a temporary file with the configuration to insert
+                  TEMP_FILE=$(mktemp)
+                  echo "    afterEvaluate { project ->" > "$TEMP_FILE"
+                  echo "        if (project.hasProperty('android')) {" >> "$TEMP_FILE"
+                  echo "            project.android {" >> "$TEMP_FILE"
+                  echo "                compileOptions {" >> "$TEMP_FILE"
+                  echo "                    sourceCompatibility JavaVersion.VERSION_17" >> "$TEMP_FILE"
+                  echo "                    targetCompatibility JavaVersion.VERSION_17" >> "$TEMP_FILE"
+                  echo "                }" >> "$TEMP_FILE"
+                  echo "            }" >> "$TEMP_FILE"
+                  echo "        }" >> "$TEMP_FILE"
+                  echo "" >> "$TEMP_FILE"
+                  echo "        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {" >> "$TEMP_FILE"
+                  echo "            kotlinOptions {" >> "$TEMP_FILE"
+                  echo "                jvmTarget = \"17\"" >> "$TEMP_FILE"
+                  echo "            }" >> "$TEMP_FILE"
+                  echo "        }" >> "$TEMP_FILE"
+                  echo "    }" >> "$TEMP_FILE"
+                  
+                  # Insert the content after the subprojects { line
+                  head -n "$SUBPROJECTS_LINE" "$ROOT_GRADLE" > "${ROOT_GRADLE}.tmp"
+                  cat "$TEMP_FILE" >> "${ROOT_GRADLE}.tmp"
+                  tail -n +"$((SUBPROJECTS_LINE + 1))" "$ROOT_GRADLE" >> "${ROOT_GRADLE}.tmp"
+                  mv "${ROOT_GRADLE}.tmp" "$ROOT_GRADLE"
+                  rm "$TEMP_FILE"
+                fi
               fi
             fi
 
