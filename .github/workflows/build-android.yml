@@ -91,42 +91,40 @@ jobs:
           ROOT_GRADLE="android/build.gradle"
           if [ -f "$ROOT_GRADLE" ]; then
             echo "Configuring global JVM target in root build.gradle"
-            
-            # Add allprojects or subprojects configuration if not present
-            if ! grep -q "allprojects {" "$ROOT_GRADLE" && ! grep -q "subprojects {" "$ROOT_GRADLE"; then
-              # Add subprojects configuration at the end
-              cat >> "$ROOT_GRADLE" << 'EOF'
 
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
-            }
-        }
-        
-        // Configure Kotlin JVM target for all Kotlin compilation tasks
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
-        }
-    }
-}
-EOF
+            # Add subprojects configuration if not present
+            if ! grep -q "subprojects {" "$ROOT_GRADLE"; then
+              # Add subprojects configuration at the end
+              echo "" >> "$ROOT_GRADLE"
+              echo "subprojects {" >> "$ROOT_GRADLE"
+              echo "    afterEvaluate { project ->" >> "$ROOT_GRADLE"
+              echo "        if (project.hasProperty('android')) {" >> "$ROOT_GRADLE"
+              echo "            project.android {" >> "$ROOT_GRADLE"
+              echo "                compileOptions {" >> "$ROOT_GRADLE"
+              echo "                    sourceCompatibility JavaVersion.VERSION_17" >> "$ROOT_GRADLE"
+              echo "                    targetCompatibility JavaVersion.VERSION_17" >> "$ROOT_GRADLE"
+              echo "                }" >> "$ROOT_GRADLE"
+              echo "            }" >> "$ROOT_GRADLE"
+              echo "        }" >> "$ROOT_GRADLE"
+              echo "        " >> "$ROOT_GRADLE"
+              echo "        // Configure Kotlin JVM target for all Kotlin compilation tasks" >> "$ROOT_GRADLE"
+              echo "        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {" >> "$ROOT_GRADLE"
+              echo "            kotlinOptions {" >> "$ROOT_GRADLE"
+              echo "                jvmTarget = \"17\"" >> "$ROOT_GRADLE"
+              echo "            }" >> "$ROOT_GRADLE"
+              echo "        }" >> "$ROOT_GRADLE"
+              echo "    }" >> "$ROOT_GRADLE"
+              echo "}" >> "$ROOT_GRADLE"
             else
               # Update existing configuration
-              echo "Root build.gradle already has allprojects/subprojects configuration"
-              # We'll still add our configuration to ensure it's applied
+              echo "Root build.gradle already has subprojects configuration"
+              # Add our configuration if tasks.withType is not already present
               if ! grep -q "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)" "$ROOT_GRADLE"; then
                 # Add Kotlin JVM target configuration to existing subprojects block
                 sed -i '/subprojects {/a\    afterEvaluate { project ->\n        if (project.hasProperty('"'"'android'"'"')) {\n            project.android {\n                compileOptions {\n                    sourceCompatibility JavaVersion.VERSION_17\n                    targetCompatibility JavaVersion.VERSION_17\n                }\n            }\n        }\n        \n        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n            kotlinOptions {\n                jvmTarget = "17"\n            }\n        }\n    }' "$ROOT_GRADLE"
               fi
             fi
-            
+
             echo "Updated root build.gradle:"
             cat "$ROOT_GRADLE"
           fi
