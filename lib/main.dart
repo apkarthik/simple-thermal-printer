@@ -86,15 +86,17 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     });
   }
 
+  String _extractTextFromMedia(SharedMediaFile media) {
+    // For text shares, the content is in the 'path' property
+    // For media with captions, check the 'message' property
+    return media.message?.isNotEmpty == true ? media.message! : media.path;
+  }
+
   void _initSharedIntent() {
     // For sharing text when app is already opened
     _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
       if (value.isNotEmpty && mounted) {
-        // Extract text from SharedMediaFile
-        // For text shares, the content is in the 'path' property
-        // For media with captions, check the 'message' property
-        final SharedMediaFile media = value.first;
-        final String sharedText = media.message?.isNotEmpty == true ? media.message! : media.path;
+        final String sharedText = _extractTextFromMedia(value.first);
         if (sharedText.isNotEmpty) {
           setState(() {
             textController.text = sharedText;
@@ -109,11 +111,7 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     // For sharing text when app is closed
     ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile>? value) {
       if (value != null && value.isNotEmpty && mounted) {
-        // Extract text from SharedMediaFile
-        // For text shares, the content is in the 'path' property
-        // For media with captions, check the 'message' property
-        final SharedMediaFile media = value.first;
-        final String sharedText = media.message?.isNotEmpty == true ? media.message! : media.path;
+        final String sharedText = _extractTextFromMedia(value.first);
         if (sharedText.isNotEmpty) {
           setState(() {
             textController.text = sharedText;
