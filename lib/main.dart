@@ -88,8 +88,12 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
 
   String _extractTextFromMedia(SharedMediaFile media) {
     // For text shares, the content is in the 'path' property
-    // For media with captions, check the 'message' property
-    return media.message?.isNotEmpty == true ? media.message! : media.path;
+    // For media with captions, check the 'message' property first
+    if (media.message?.isNotEmpty == true) {
+      return media.message!;
+    }
+    // For plain text shares, the text is stored in the 'path' property
+    return media.path ?? '';
   }
 
   void _initSharedIntent() {
