@@ -86,6 +86,51 @@ jobs:
 
       - name: Configure JVM target compatibility to 17
         run: |
+          # Configure root build.gradle to apply JVM target 17 to ALL subprojects
+          # This ensures plugins like receive_sharing_intent also use JVM target 17
+          ROOT_GRADLE="android/build.gradle"
+          if [ -f "$ROOT_GRADLE" ]; then
+            echo "Configuring global JVM target in root build.gradle"
+            
+            # Add allprojects or subprojects configuration if not present
+            if ! grep -q "allprojects {" "$ROOT_GRADLE" && ! grep -q "subprojects {" "$ROOT_GRADLE"; then
+              # Add subprojects configuration at the end
+              cat >> "$ROOT_GRADLE" << 'EOF'
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+        
+        // Configure Kotlin JVM target for all Kotlin compilation tasks
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+}
+EOF
+            else
+              # Update existing configuration
+              echo "Root build.gradle already has allprojects/subprojects configuration"
+              # We'll still add our configuration to ensure it's applied
+              if ! grep -q "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)" "$ROOT_GRADLE"; then
+                # Add Kotlin JVM target configuration to existing subprojects block
+                sed -i '/subprojects {/a\    afterEvaluate { project ->\n        if (project.hasProperty('"'"'android'"'"')) {\n            project.android {\n                compileOptions {\n                    sourceCompatibility JavaVersion.VERSION_17\n                    targetCompatibility JavaVersion.VERSION_17\n                }\n            }\n        }\n        \n        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n            kotlinOptions {\n                jvmTarget = "17"\n            }\n        }\n    }' "$ROOT_GRADLE"
+              fi
+            fi
+            
+            echo "Updated root build.gradle:"
+            cat "$ROOT_GRADLE"
+          fi
+
           # For Groovy DSL (build.gradle)
           if [ -f "android/app/build.gradle" ]; then
             APP_GRADLE="android/app/build.gradle"
