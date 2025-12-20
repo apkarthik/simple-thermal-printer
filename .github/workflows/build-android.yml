@@ -119,7 +119,7 @@ jobs:
               # Update existing configuration
               echo "Root build.gradle already has subprojects configuration"
               # Add our configuration if tasks.withType is not already present
-              if ! grep -q "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile)" "$ROOT_GRADLE"; then
+              if ! grep -q "tasks.withType.*KotlinCompile" "$ROOT_GRADLE"; then
                 # Find the line number where subprojects block starts
                 SUBPROJECTS_LINE=$(grep -n "subprojects {" "$ROOT_GRADLE" | head -1 | cut -d: -f1)
                 if [ -n "$SUBPROJECTS_LINE" ]; then
@@ -141,7 +141,7 @@ jobs:
                   echo "            }" >> "$TEMP_FILE"
                   echo "        }" >> "$TEMP_FILE"
                   echo "    }" >> "$TEMP_FILE"
-                  
+
                   # Insert the content after the subprojects { line
                   head -n "$SUBPROJECTS_LINE" "$ROOT_GRADLE" > "${ROOT_GRADLE}.tmp"
                   cat "$TEMP_FILE" >> "${ROOT_GRADLE}.tmp"
