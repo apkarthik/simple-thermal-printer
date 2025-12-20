@@ -86,26 +86,42 @@ class _PrinterHomePageState extends State<PrinterHomePage> {
     });
   }
 
+  String _extractTextFromMedia(SharedMediaFile media) {
+    // For text shares, the content is in the 'path' property
+    // For media with captions, check the 'message' property first
+    if (media.message?.isNotEmpty == true) {
+      return media.message!;
+    }
+    // For plain text shares, the text is stored in the 'path' property
+    return media.path ?? '';
+  }
+
   void _initSharedIntent() {
     // For sharing text when app is already opened
-    _intentDataStreamSubscription = ReceiveSharingIntent.getTextStream().listen((String value) {
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
       if (value.isNotEmpty && mounted) {
-        setState(() {
-          textController.text = value;
-        });
-        _showSharedContentDialog(value);
+        final String sharedText = _extractTextFromMedia(value.first);
+        if (sharedText.isNotEmpty) {
+          setState(() {
+            textController.text = sharedText;
+          });
+          _showSharedContentDialog(sharedText);
+        }
       }
     }, onError: (err) {
       debugPrint("Error receiving shared intent: $err");
     });
 
     // For sharing text when app is closed
-    ReceiveSharingIntent.getInitialText().then((String? value) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile>? value) {
       if (value != null && value.isNotEmpty && mounted) {
-        setState(() {
-          textController.text = value;
-        });
-        _showSharedContentDialog(value);
+        final String sharedText = _extractTextFromMedia(value.first);
+        if (sharedText.isNotEmpty) {
+          setState(() {
+            textController.text = sharedText;
+          });
+          _showSharedContentDialog(sharedText);
+        }
       }
     }).catchError((error) {
       debugPrint("Error getting initial shared intent: $error");
