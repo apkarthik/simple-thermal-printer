@@ -84,6 +84,74 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Configure JVM target compatibility to 17
+        run: |
+          # Determine which gradle file exists for the app
+          if [ -f "android/app/build.gradle.kts" ]; then
+            APP_GRADLE="android/app/build.gradle.kts"
+          else
+            APP_GRADLE="android/app/build.gradle"
+          fi
+
+          echo "Configuring JVM target in: $APP_GRADLE"
+
+          # For Groovy DSL (build.gradle)
+          if [ -f "android/app/build.gradle" ]; then
+            # Add compileOptions and kotlinOptions inside the android block if not present
+            if ! grep -q "compileOptions" "$APP_GRADLE"; then
+              # Find the android block and add compileOptions
+              sed -i '/^android {/a\    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }' "$APP_GRADLE"
+            else
+              # Update existing compileOptions
+              sed -i 's/sourceCompatibility JavaVersion\.VERSION_[0-9_]*/sourceCompatibility JavaVersion.VERSION_17/' "$APP_GRADLE"
+              sed -i 's/targetCompatibility JavaVersion\.VERSION_[0-9_]*/targetCompatibility JavaVersion.VERSION_17/' "$APP_GRADLE"
+            fi
+
+            # Add kotlinOptions if not present
+            if ! grep -q "kotlinOptions" "$APP_GRADLE"; then
+              sed -i '/compileOptions {/,/}/a\    kotlinOptions {\n        jvmTarget = "17"\n    }' "$APP_GRADLE"
+            else
+              # Update existing kotlinOptions
+              sed -i 's/jvmTarget = "[0-9.]*"/jvmTarget = "17"/' "$APP_GRADLE"
+              sed -i "s/jvmTarget = '[0-9.]*'/jvmTarget = '17'/" "$APP_GRADLE"
+            fi
+          fi
+
+          # For Kotlin DSL (build.gradle.kts)
+          if [ -f "android/app/build.gradle.kts" ]; then
+            if ! grep -q "compileOptions" "$APP_GRADLE"; then
+              sed -i '/^android {/a\    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }' "$APP_GRADLE"
+            else
+              sed -i 's/sourceCompatibility = JavaVersion\.VERSION_[0-9_]*/sourceCompatibility = JavaVersion.VERSION_17/' "$APP_GRADLE"
+              sed -i 's/targetCompatibility = JavaVersion\.VERSION_[0-9_]*/targetCompatibility = JavaVersion.VERSION_17/' "$APP_GRADLE"
+            fi
+
+            if ! grep -q "kotlinOptions" "$APP_GRADLE"; then
+              sed -i '/compileOptions {/,/}/a\    kotlinOptions {\n        jvmTarget = "17"\n    }' "$APP_GRADLE"
+            else
+              sed -i 's/jvmTarget = "[0-9.]*"/jvmTarget = "17"/' "$APP_GRADLE"
+            fi
+          fi
+
+          echo "Updated app build.gradle:"
+          cat "$APP_GRADLE"
+
+          # Also check and update root build.gradle if it exists
+          if [ -f "android/build.gradle" ]; then
+            ROOT_GRADLE="android/build.gradle"
+            echo "Checking root build.gradle: $ROOT_GRADLE"
+            
+            # Ensure kotlin jvmTarget is set in the root gradle too if kotlin plugin is configured there
+            if grep -q "kotlin-android" "$ROOT_GRADLE"; then
+              if ! grep -q "kotlinOptions" "$ROOT_GRADLE"; then
+                # Add kotlinOptions in allprojects or subprojects block if present
+                if grep -q "allprojects" "$ROOT_GRADLE"; then
+                  sed -i '/allprojects {/,/^}/s/tasks\.withType.*KotlinCompile.*/&\n        kotlinOptions {\n            jvmTarget = "17"\n        }/' "$ROOT_GRADLE"
+                fi
+              fi
+            fi
+          fi
+
       - name: Patch blue_thermal_printer plugin for AGP 8.0+ compatibility
         run: |
           # Find and patch the blue_thermal_printer plugin build.gradle to add namespace
